@@ -1,0 +1,6 @@
+*.aux
+*.glob
+*.vo*
+*CoqMakefile*
+shell.nix
+.dir-locals.el

@@ -1,0 +1,29 @@
+synopsis: "Probability distributions with finite support"
+name: "coq-finprob"
+opam-version: "2.0"
+version: "dev"
+maintainer: "arthur.aa@gmail.com"
+homepage: "https://github.com/arthuraa/finprob"
+dev-repo: "git+https://github.com/arthuraa/finprob.git"
+bug-reports: "https://github.com/arthuraa/finprob/issues"
+authors: ["Arthur Azevedo de Amorim"]
+license: "MIT"
+build: [
+  [make "-j%{jobs}%"]
+]
+install: [
+  [make "install"]
+]
+depends: [
+  "ocaml"
+  "coq" {(>= "8.11" & < "8.15~") | (= "dev")}
+  "coq-mathcomp-ssreflect" {(>= "1.12" & < "1.14~") | (= "dev")}
+  "coq-mathcomp-algebra" {(>= "1.12" & < "1.14~") | (= "dev")}
+  "coq-deriving" {(>= "0.1") | (= "dev")}
+  "coq-extructures" {(>= "0.3") | (= "dev")}
+]
+tags: [
+  "keyword:probability theory"
+  "category:Computer Science/Data Types and Data Structures"
+  "logpath:finprob"
+]
