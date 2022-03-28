@@ -75,6 +75,9 @@ case: (boolP (x \in supp d))=> [|/suppPn -> //].
 apply/allP: x; exact/(valP d).
 Qed.
 
+Lemma mem_suppd d x : (x \in supp d) = (0 < d x).
+Proof. by rewrite mem_supp Num.Theory.lt0r distr_ge0 andbT. Qed.
+
 Definition mass d := \sum_(x <- supp d) d x.
 
 Lemma massE d X :
