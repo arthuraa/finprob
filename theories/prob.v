@@ -166,23 +166,25 @@ Proof.
 by apply/eqP=> e; move: (eqP (valP p)); rewrite /mass e big_nil.
 Qed.
 
-Definition dirac_def x x' : rat :=
-  if x == x' then 1 else 0.
+Definition pchoose p : T := xchoose (fset0Pn _ (suppPrN0 p)).
+
+Lemma pchoose_supp p : pchoose p \in supp p.
+Proof. exact: xchooseP. Qed.
+
+Definition dirac_def x x' : rat := (x == x')%:R.
 
 Lemma dirac_subproof1 x x' : x' \in fset1 x -> 0 <= dirac_def x x'.
 Proof. by rewrite /dirac_def; case: eq_op. Qed.
 
 Lemma dirac_subproof2 x : \sum_(x' <- fset1 x) dirac_def x x' = 1.
-Proof.
-by rewrite /= big_seq1 /dirac_def eqxx.
-Qed.
+Proof. by rewrite /= big_seq1 /dirac_def eqxx. Qed.
 
 (** Point mass distribution *)
 
 Definition dirac x :=
   mkprob (@dirac_subproof1 x) (dirac_subproof2 x).
 
-Lemma diracE x x' : dirac x x' = if x' == x then 1 else 0.
+Lemma diracE x x' : dirac x x' = (x' == x)%:R.
 Proof.
 rewrite /dirac /dirac_def /= mkprobE in_fset1.
 by rewrite eq_sym; case: (x == x').
@@ -191,7 +193,7 @@ Qed.
 Lemma supp_dirac x : supp (dirac x) = fset1 x.
 Proof.
 apply/eq_fset=> x'.
-by rewrite mem_supp in_fset1 diracE; case: ifP.
+by rewrite mem_supp in_fset1 diracE; case: (x' =P x).
 Qed.
 
 Lemma supp_diracP x x' : reflect (x' = x) (x' \in supp (dirac x)).
@@ -225,32 +227,20 @@ case: (boolP (x \in supp p2)) => x_p2; last by rewrite (suppPn x_p2).
 by move=> /allP/(_ _ x_p2); rewrite xP => /eqP ->.
 Qed.
 
-Lemma in_eq_projR p1 p2 : {in supp p2, p1 =1 p2} -> p1 = p2.
+Lemma in_eq_probR p1 p2 : {in supp p2, p1 =1 p2} -> p1 = p2.
 Proof.
 by move=> e; apply/esym/in_eq_probL=> x x_p2; rewrite e.
 Qed.
 
-Definition of_dirac p : option T :=
-  if val (supp p) is [:: x] then Some x
-  else None.
-
-Lemma diracK : pcancel dirac of_dirac.
-Proof. by move=> x; rewrite /of_dirac supp_dirac /=. Qed.
-
-Lemma of_diracK : ocancel of_dirac dirac.
-Proof.
-rewrite /of_dirac => p.
-case e: (val (supp p))=> [//|x[|//]] /=.
-have {}e: supp p = fset1 x by rewrite fset1E -e fsvalK.
-move/eqP: (valP p); rewrite /mass e /= big_seq1 => p_x.
-apply/in_eq_projR=> y; rewrite e => /fset1P ->.
-by rewrite p_x diracE eqxx.
-Qed.
+Lemma diracK : cancel dirac pchoose.
+Proof. by move=> x; have /supp_diracP := pchoose_supp (dirac x). Qed.
 
 Lemma eq_supp_dirac p x : (supp p == fset1 x) = (p == dirac x).
 Proof.
 apply/(sameP eqP)/(iffP eqP)=> [->|e]; first exact: supp_dirac.
-by move: (of_diracK p); rewrite /of_dirac e /= => <-.
+apply/in_eq_probR => _ /supp_diracP ->.
+have:= massE (fsubsetxx (supp p)); rewrite e big_seq1 (eqP (valP p)) => <-.
+by rewrite diracE eqxx.
 Qed.
 
 End Prob.
@@ -261,7 +251,7 @@ Notation "{ 'prob' T }" := (prob_of (Phant T))
   (at level 0, format "{ 'prob'  T }") : form_scope.
 
 Arguments dirac {_} x.
-Arguments of_dirac {_} p.
+Arguments pchoose {_} p.
 Arguments dirac_inj {_}.
 
 Section Sample.
@@ -345,19 +335,18 @@ Section SampleProperties.
 
 Variables T S : ordType.
 
+Import GRing.
+
 Lemma sample_diracL (x : T) (f : T -> {prob S}) : sample (dirac x) f = f x.
 Proof.
 apply/eq_prob=> y; rewrite sampleE supp_dirac /= big_seq1.
-by rewrite mkprobE in_fset1 eqxx /dirac_def eqxx GRing.mul1r.
+by rewrite mkprobE in_fset1 eqxx /dirac_def eqxx mul1r.
 Qed.
 
 Lemma sample_diracR (p : {prob T}) : sample p dirac = p.
 Proof.
 apply/eq_prob=> x; rewrite sampleE.
-transitivity (\sum_(x' <- supp p) if x == x' then p x' else 0).
-  apply/eq_big=> // x' _.
-  rewrite diracE /= eq_sym.
-  case: eq_op; by rewrite ?GRing.mulr0 ?GRing.mulr1.
+under eq_big => [y|y _] do [|rewrite diracE 2!fun_if mulr1 mulr0].
 rewrite -big_mkcond /= -big_filter -val_fset_filter.
 case: (boolP (x \in supp p))=> x_p.
   rewrite (_ : fset_filter _ _ = fset1 x) /= ?big_seq1 //.
@@ -386,8 +375,7 @@ Qed.
 Lemma sample_const (px : {prob T}) (py : {prob S}) :
   (sample: _ <- px; py) = py.
 Proof.
-apply/eq_prob=> y.
-rewrite sampleE -GRing.mulr_suml -[RHS]GRing.mul1r; congr *%R.
+apply/eq_prob=> y; rewrite sampleE -mulr_suml -[RHS]mul1r; congr *%R.
 exact/eqP/(valP px).
 Qed.
 
@@ -435,12 +423,10 @@ Lemma sampleC (T S R : ordType) (p1 : {prob T}) (p2 : {prob S}) (f : T -> S -> {
   (sample: y <- p2; sample: x <- p1; f x y).
 Proof.
 apply/eq_prob=> z; rewrite !sampleE.
-under eq_big => [x|x _]; first over.
-  rewrite sampleE GRing.mulr_sumr; over.
+under eq_big => [x|x _] do [|rewrite sampleE GRing.mulr_sumr].
 under [in RHS]eq_big=> [y|y _]; first over.
   rewrite sampleE GRing.mulr_sumr.
-  under eq_big=> [x|x _]; first over.
-    rewrite GRing.mulrA [p2 _ * _]GRing.mulrC -GRing.mulrA; over.
+  under eq_big => [x|x _] do [|rewrite GRing.mulrCA].
   over.
 by rewrite /= exchange_big.
 Qed.
