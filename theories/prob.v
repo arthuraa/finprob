@@ -23,6 +23,9 @@ Unset Printing Implicit Defensive.
 Local Open Scope ring_scope.
 Local Open Scope fset_scope.
 
+Declare Scope prob_scope.
+Local Open Scope prob_scope.
+
 Definition int_ordMixin := CanOrdMixin natsum_of_intK.
 Canonical int_ordType := Eval hnf in OrdType int int_ordMixin.
 
@@ -254,6 +257,133 @@ Arguments dirac {_} x.
 Arguments pchoose {_} p.
 Arguments dirac_inj {_}.
 
+Section Expectation.
+
+Variable T : ordType.
+
+Implicit Types (p : {prob T}) (x y z : T) (F : T -> rat).
+Implicit Types (X Y : {fset T}).
+
+Import GRing.
+
+Definition expect p F : rat :=
+  \sum_(x <- supp p) F x * p x.
+
+Notation "''E_' ( x <- p ) F" := (expect p (fun x => F))
+  (at level 41, F at level 41, x, p at level 50,
+    format "'[' ''E_' ( x  <-  p )  '/  ' F ']'").
+
+Lemma expectE X p F :
+  fsubset (supp p) X ->
+  'E_(x <- p) F x = \sum_(x <- X) F x * p x.
+Proof.
+rewrite /expect => p_in_X.
+rewrite -(fsetID X (supp p)) (fsetIidPr p_in_X) big_fsetU /=; last first.
+  by rewrite fdisjointC; apply/fsetDidPl; rewrite fsetDDl fsetUid.
+rewrite [X in _ + X]big_seq /= [X in _ + X]big1 ?addr0 //.
+by move=> ? /fsetDP => - [_ /suppPn ->]; rewrite mulr0.
+Qed.
+
+Lemma expect_dirac x F : 'E_(y <- dirac x) F y = F x.
+Proof.
+by rewrite /expect supp_dirac /= big_seq1 diracE eqxx mulr1.
+Qed.
+
+Lemma mulr_expectr r p F : r * ('E_(x <- p) F x) = 'E_(x <- p) r * F x.
+Proof.
+rewrite /expect mulr_sumr; apply/eq_big => [//|x _].
+by rewrite mulrA.
+Qed.
+
+Lemma mulr_expectl r p F : ('E_(x <- p) F x) * r = 'E_(x <- p) F x * r.
+Proof.
+rewrite /expect mulr_suml; apply/eq_big => [//|x _].
+by rewrite mulrAC.
+Qed.
+
+
+Lemma addr_expect p F1 F2 :
+  'E_(x <- p) F1 x + 'E_(x <- p) F2 x =
+  'E_(x <- p) (F1 x + F2 x).
+Proof.
+rewrite /expect -big_split; apply/eq_big => // x _.
+by rewrite mulrDl.
+Qed.
+
+Lemma eq_expect_gen p1 p2 F1 F2 :
+  (forall x, F1 x * p1 x = F2 x * p2 x) ->
+  expect p1 F1 = expect p2 F2.
+Proof.
+move=> e12.
+rewrite (expectE _ (fsubsetUl (supp p1) (supp p2))).
+rewrite (expectE _ (fsubsetUr (supp p1) (supp p2))).
+exact/eq_big.
+Qed.
+
+Lemma eq_expect_in p F1 F2 :
+  {in supp p, F1 =1 F2} ->
+  expect p F1 = expect p F2.
+Proof.
+move=> e12; apply/eq_expect_gen => x.
+case: (boolP (x \in supp p)) => [x_in|x_nin]; rewrite ?(e12 _ x_in) //.
+by rewrite (suppPn x_nin) !mulr0.
+Qed.
+
+Lemma eq_expect p F1 F2 : F1 =1 F2 -> expect p F1 = expect p F2.
+Proof.
+move=> e12; apply: eq_expect_in => ??; exact: e12.
+Qed.
+
+Lemma expect_const c p F :
+  (forall x, x \in supp p -> F x = c) ->
+  'E_(x <- p) F x = c.
+Proof.
+move=> Fc.
+rewrite -[c]mul1r -(eqP (valP p)) /mass /= mulr_suml.
+rewrite [LHS]big_seq [RHS]big_seq; apply/eq_big => // x /Fc ->.
+by rewrite mulrC.
+Qed.
+
+Lemma sumr_expect I s (P : I -> bool) p (F : I -> T -> rat) :
+  \sum_(i <- s | P i) 'E_(x <- p) F i x =
+  'E_(x <- p) \sum_(i <- s | P i) F i x.
+Proof.
+elim: s => [|i s IH].
+  by rewrite big_nil (@expect_const 0) // => ? _; rewrite big_nil.
+under [in RHS]eq_expect => x do rewrite big_cons.
+rewrite big_cons IH; case: (P i) => //.
+by rewrite addr_expect.
+Qed.
+
+Lemma expect_ge0 p F :
+  (forall x, x \in supp p -> 0 <= F x) ->
+  0 <= expect p F.
+Proof.
+move=> F_ge0; apply: Num.Theory.sumr_ge0 => x _.
+case: (boolP (x \in supp p)) => [x_in|/suppPn ->]; rewrite ?mulr0 //.
+by rewrite Num.Theory.mulr_ge0 // ?F_ge0 // distr_ge0.
+Qed.
+
+End Expectation.
+
+Notation "''E_' ( x <- p ) F" := (expect p (fun x => F))
+  (at level 41, F at level 41, x, p at level 50,
+    format "'[' ''E_' ( x  <-  p )  '/  ' F ']'")
+  : prob_scope.
+
+Arguments expect_const {T} c.
+
+Lemma expectC (T S : ordType) p q (F : T -> S -> rat) :
+  'E_(x <- p) 'E_(y <- q) F x y =
+  'E_(y <- q) 'E_(x <- p) F x y.
+Proof.
+rewrite /expect.
+under [LHS]eq_big => [//|x _] do rewrite GRing.mulr_suml.
+under [RHS]eq_big => [//|x _] do rewrite GRing.mulr_suml.
+rewrite exchange_big /=; apply/eq_big => // x _.
+by under eq_big => [//|y _] do rewrite GRing.mulrAC.
+Qed.
+
 Section Sample.
 
 Variables T S : ordType.
@@ -261,7 +391,7 @@ Variable (p : {prob T}) (f : T -> {prob S}).
 Implicit Types (x : T) (y : S).
 
 Let Y   : {fset S} := \bigcup_(x <- supp p) supp (f x).
-Let P y : rat      := \sum_(x <- supp p) p x * f x y.
+Let P y : rat      := 'E_(x <- p) f x y.
 
 Lemma sample_subproof1 y : y \in Y -> 0 <= P y.
 Proof.
@@ -271,12 +401,8 @@ Qed.
 
 Lemma sample_subproof2 : \sum_(y <- Y) P y = 1.
 Proof.
-rewrite /P exchange_big /= -(eqP (valP p)).
-apply/eq_big=> //= x _.
-case: (boolP (x \in supp p)); last first.
-  by move=> /suppPn ->; apply/big1=> y _; rewrite GRing.mul0r.
-rewrite -GRing.mulr_sumr -[RHS]GRing.mulr1 => x_p; congr (_ * _).
-rewrite -(eqP (valP (f x))) /=; symmetry; apply/massE.
+rewrite /P sumr_expect (expect_const 1) // => x x_in.
+rewrite -(eqP (valP (f x))); apply/esym/massE.
 apply/fsubsetP=> y; rewrite mem_supp => yP.
 apply/bigcupP; exists x=> //.
 by rewrite mem_supp.
@@ -320,9 +446,6 @@ End Sample.
 
 Arguments supp_sampleP {_ _ _ _ _}.
 
-Declare Scope prob_scope.
-Local Open Scope prob_scope.
-
 (** A more convenient notation for sampling. *)
 
 Notation "'sample:' x '<-' t1 ';' t2" :=
@@ -339,22 +462,19 @@ Import GRing.
 
 Lemma sample_diracL (x : T) (f : T -> {prob S}) : sample (dirac x) f = f x.
 Proof.
-apply/eq_prob=> y; rewrite sampleE supp_dirac /= big_seq1.
-by rewrite mkprobE in_fset1 eqxx /dirac_def eqxx mul1r.
+by apply/eq_prob=> y; rewrite sampleE expect_dirac.
 Qed.
 
 Lemma sample_diracR (p : {prob T}) : sample p dirac = p.
 Proof.
 apply/eq_prob=> x; rewrite sampleE.
-under eq_big => [y|y _] do [|rewrite diracE 2!fun_if mulr1 mulr0].
-rewrite -big_mkcond /= -big_filter -val_fset_filter.
-case: (boolP (x \in supp p))=> x_p.
-  rewrite (_ : fset_filter _ _ = fset1 x) /= ?big_seq1 //.
-  apply/eq_fset=> x'; rewrite in_fset_filter in_fset1 eq_sym.
-  by case: (x' =P x)=> [->|].
-rewrite (_ : fset_filter _ _ = fset0) /= ?big_nil ?(suppPn x_p) //.
-apply/eq_fset=> x'; rewrite in_fset_filter eq_sym.
-by case: (x' =P x)=> // ->; rewrite (negbTE x_p).
+under eq_expect do rewrite diracE.
+case: (boolP (x \in supp p)) => [x_in|x_nin]; last first.
+  rewrite (suppPn x_nin); apply/(expect_const 0) => y y_in.
+  by case: eqP y_in x_nin => [->|//] ->.
+rewrite /expect (big_rem _ x_in) /= eqxx mul1r big_seq big1 ?addr0 // => y.
+rewrite mem_rem_uniq ?uniq_fset //= eq_sym.
+by case/andP => /negbTE ->; rewrite mul0r.
 Qed.
 
 Lemma eq_sample (p : {prob T}) (f g : T -> {prob S}) :
@@ -368,15 +488,13 @@ Lemma eq_in_sample (p : {prob T}) (f g : T -> {prob S}) :
   {in supp p, f =1 g} -> sample p f = sample p g.
 Proof.
 move=> efg; apply/eq_prob=> y.
-rewrite !sampleE big_seq [in RHS]big_seq.
-by apply/eq_big=> // x /efg ->.
+by rewrite !sampleE; apply/eq_expect_in => // x /efg ->.
 Qed.
 
 Lemma sample_const (px : {prob T}) (py : {prob S}) :
   (sample: _ <- px; py) = py.
 Proof.
-apply/eq_prob=> y; rewrite sampleE -mulr_suml -[RHS]mul1r; congr *%R.
-exact/eqP/(valP px).
+by apply/eq_prob=> y; rewrite sampleE (expect_const (py y)).
 Qed.
 
 Lemma eq_sample_dirac (p : {prob T}) (f : T -> {prob S}) y :
@@ -395,27 +513,28 @@ Qed.
 
 End SampleProperties.
 
-Lemma sampleA (T S R : ordType) p (f : T -> {prob S}) (g : S -> {prob R}) :
-  (sample: y <- (sample: x <- p; f x); g y) =
-  (sample: x <- p; sample: y <- f x; g y).
+Lemma expect_sample (T S : ordType) p (f : T -> {prob S}) (G : S -> rat) :
+  'E_(y <- sample p f) G y =
+  'E_(x <- p) 'E_(y <- f x) G y.
 Proof.
-apply/eq_prob=> z.
-transitivity (\sum_(y <- supp (sample: x <- p; f x))
-                \sum_(x <- supp p) p x * f x y * g y z).
-  rewrite sampleE; apply/eq_big=> // y _.
-  by rewrite sampleE GRing.mulr_suml.
-rewrite sampleE exchange_big /= big_seq [RHS]big_seq.
-apply/eq_big=> // x px.
-transitivity (\sum_(y <- supp (sample: x <- p; f x))
-                 p x * (f x y * g y z)).
-  by apply/eq_big=> ? // _; rewrite GRing.mulrA.
-rewrite <- GRing.mulr_sumr; congr *%R; rewrite sampleE.
+rewrite /expect.
+under [LHS]eq_big => [//|x _] do rewrite sampleE mulr_expectr.
+rewrite exchange_big /= [LHS]big_seq [RHS]big_seq.
+apply/eq_big => // x x_in; rewrite GRing.mulr_suml.
 have /fsetIidPl <-: fsubset (supp (f x)) (supp (sample: x <- p; f x)).
   apply/fsubsetP=> y fxy; rewrite supp_sample.
   by apply/bigcupP; exists x.
 rewrite /fsetI val_fset_filter big_filter [RHS]big_mkcond /=.
 apply/eq_big=> // y _; rewrite mem_supp.
-by case: eqP=> //= ->; rewrite GRing.mul0r.
+by case: eqP=> //= ->; rewrite GRing.mulr0 GRing.mul0r.
+Qed.
+
+Lemma sampleA (T S R : ordType) p (f : T -> {prob S}) (g : S -> {prob R}) :
+  (sample: y <- (sample: x <- p; f x); g y) =
+  (sample: x <- p; sample: y <- f x; g y).
+Proof.
+apply/eq_prob=> z; rewrite !sampleE expect_sample.
+by under [RHS]eq_expect => ? do rewrite sampleE.
 Qed.
 
 Lemma sampleC (T S R : ordType) (p1 : {prob T}) (p2 : {prob S}) (f : T -> S -> {prob R}) :
@@ -423,15 +542,10 @@ Lemma sampleC (T S R : ordType) (p1 : {prob T}) (p2 : {prob S}) (f : T -> S -> {
   (sample: y <- p2; sample: x <- p1; f x y).
 Proof.
 apply/eq_prob=> z; rewrite !sampleE.
-under eq_big => [x|x _] do [|rewrite sampleE GRing.mulr_sumr].
-under [in RHS]eq_big=> [y|y _]; first over.
-  rewrite sampleE GRing.mulr_sumr.
-  under eq_big => [x|x _] do [|rewrite GRing.mulrCA].
-  over.
-by rewrite /= exchange_big.
+under [LHS]eq_expect do rewrite sampleE.
+under [RHS]eq_expect do rewrite sampleE.
+by rewrite expectC.
 Qed.
-
-Open Scope prob_scope.
 
 Section Uniform.
 
