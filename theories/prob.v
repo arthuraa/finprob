@@ -13,6 +13,7 @@ From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat choice seq
   ssrint rat ssralg ssrnum bigop path.
 
 From extructures Require Import ord fset fmap ffun.
+From extructures.instances Require Import instances.
 
 From deriving Require Import deriving.
 
@@ -25,12 +26,6 @@ Local Open Scope fset_scope.
 
 Declare Scope prob_scope.
 Local Open Scope prob_scope.
-
-Definition int_ordMixin := CanOrdMixin natsum_of_intK.
-Canonical int_ordType := Eval hnf in OrdType int int_ordMixin.
-
-Definition rat_ordMixin := [ordMixin of rat by <:].
-Canonical rat_ordType := Eval hnf in OrdType rat rat_ordMixin.
 
 Arguments bigcupP {T I x s P F}.
 
