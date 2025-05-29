@@ -2,8 +2,8 @@
 type, which represents finite probability distributions with rational
 coefficients over the type [T], which is required to be an ordered type.
 Distributions form a monad, where the unit [dirac : T -> {prob T}] is the point
-mass distribution, whereas the monadic bind [sample : {prob T} -> (T -> {prob
-S}) -> {prob S}] samples from its first argument and feeds the sample to its
+mass distribution, whereas the monadic bind [sample : (T -> {prob S}) -> {prob
+T} -> {prob S}] samples from its first argument and feeds the sample to its
 second argument. *)
 
 Require Import Stdlib.Strings.String.
@@ -377,7 +377,7 @@ Qed.
 Section Sample.
 
 Variables T S : ordType.
-Variable (p : {prob T}) (f : T -> {prob S}).
+Variable (f : T -> {prob S}) (p : {prob T}).
 Implicit Types (x : T) (y : S).
 
 Let Y   : {fset S} := \bigcup_(x <- supp p) supp (f x).
@@ -439,7 +439,7 @@ Arguments supp_sampleP {_ _ _ _ _}.
 (** A more convenient notation for sampling. *)
 
 Notation "'sample:' x '<-' t1 ';' t2" :=
-  (sample t1 (fun x => t2))
+  (sample (fun x => t2) t1)
   (at level 20, t1 at level 100, t2 at level 200,
    right associativity, format "'[' 'sample:'  x  '<-'  '[' t1 ;  ']' ']' '/' t2")
   : prob_scope.
@@ -450,12 +450,12 @@ Variables T S : ordType.
 
 Import GRing.
 
-Lemma sample_diracL (x : T) (f : T -> {prob S}) : sample (dirac x) f = f x.
+Lemma sample_diracL (x : T) (f : T -> {prob S}) : sample f (dirac x) = f x.
 Proof.
 by apply/eq_prob=> y; rewrite sampleE expect_dirac.
 Qed.
 
-Lemma sample_diracR (p : {prob T}) : sample p dirac = p.
+Lemma sample_diracR (p : {prob T}) : sample dirac p = p.
 Proof.
 apply/eq_prob=> x; rewrite sampleE.
 under eq_expect do rewrite diracE.
@@ -468,14 +468,14 @@ by case/andP => /negbTE ->; rewrite mul0r.
 Qed.
 
 Lemma eq_sample (p : {prob T}) (f g : T -> {prob S}) :
-  f =1 g -> sample p f = sample p g.
+  f =1 g -> sample f p = sample g p.
 Proof.
 move=> efg; apply/eq_prob=> y.
 by rewrite !sampleE; apply/eq_big=> // x _; rewrite efg.
 Qed.
 
 Lemma eq_in_sample (p : {prob T}) (f g : T -> {prob S}) :
-  {in supp p, f =1 g} -> sample p f = sample p g.
+  {in supp p, f =1 g} -> sample f p = sample g p.
 Proof.
 move=> efg; apply/eq_prob=> y.
 by rewrite !sampleE; apply/eq_expect_in => // x /efg ->.
@@ -488,11 +488,11 @@ by apply/eq_prob=> y; rewrite sampleE (expect_const (py y)).
 Qed.
 
 Lemma eq_sample_dirac (p : {prob T}) (f : T -> {prob S}) y :
-  sample p f = dirac y ->
+  sample f p = dirac y ->
   forall x, x \in supp p -> f x = dirac y.
 Proof.
 move=> e x x_p.
-have {}e: supp (sample p f) = supp (dirac y) by rewrite e.
+have {}e: supp (sample f p) = supp (dirac y) by rewrite e.
 rewrite supp_sample supp_dirac in e.
 apply/eqP; rewrite -eq_supp_dirac eqEfsubset; apply/andP; split.
   rewrite -e; exact/bigcup_sup.
@@ -504,7 +504,7 @@ Qed.
 End SampleProperties.
 
 Lemma expect_sample (T S : ordType) p (f : T -> {prob S}) (G : S -> rat) :
-  'E_(y <- sample p f) G y =
+  'E_(y <- sample f p) G y =
   'E_(x <- p) 'E_(y <- f x) G y.
 Proof.
 rewrite /expect.
@@ -581,8 +581,8 @@ it is strong enough to establish the equality of two distributions, as seen in
 
 Variant coupling (T S : ordType) (R : T -> S -> Prop) pT pS : Type :=
 | Coupling p of
-  pT = sample p (dirac \o fst) &
-  pS = sample p (dirac \o snd) &
+  pT = sample (dirac \o fst) p &
+  pS = sample (dirac \o snd) p &
   (forall xy, xy \in supp p -> R xy.1 xy.2).
 
 Lemma coupling_dirac (T S : ordType) (R : T -> S -> Prop) x y :
@@ -596,7 +596,7 @@ Lemma coupling_sample (T1 S1 T2 S2 : ordType) (R1 : T1 -> S1 -> Prop) (R2 : T2 -
   coupling R1 pT pS ->
   (forall x y, x \in supp pT -> y \in supp pS -> R1 x y ->
     coupling R2 (f x) (g y)) ->
-  coupling R2 (sample pT f) (sample pS g).
+  coupling R2 (sample f pT) (sample g pS).
 Proof.
 case=> /= p eT eS R1P R12.
 pose def xy := sample: x' <- f xy.1; sample: y' <- g xy.2; dirac (x', y').
@@ -612,7 +612,7 @@ pose draw xy := if insub xy is Some xy then
                   let yP := WS _ xyP in
                   let: Coupling p _ _ _ := R12 _ _ xP yP (R1P _ xyP) in p
                 else def xy.
-exists (sample p draw).
+exists (sample draw p).
 - rewrite eT !sampleA; apply/eq_in_sample; case=> [x y] /= xy_supp.
   by rewrite sample_diracL insubT /=; case: (R12 _ _ _ _ _).
 - rewrite eS !sampleA; apply/eq_in_sample; case=> [x y] /= xy_supp.
@@ -639,7 +639,7 @@ Qed.
 
 Lemma coupling_sample_same (T S1 S2 : ordType) (R : S1 -> S2 -> Prop) (p : {prob T}) f g :
   (forall x, x \in supp p -> coupling R (f x) (g x)) ->
-  coupling R (sample p f) (sample p g).
+  coupling R (sample f p) (sample g p).
 Proof.
 move=> e; apply: coupling_sample; first exact: coupling_same.
 move=> x _ x_p _ <-; exact: e.
@@ -708,7 +708,7 @@ the elements of sequences, maps and other container types.  They will be used to
 define the semantics of Imp programs. *)
 
 Definition foldrM T (S : ordType) (f : T -> S -> {prob S}) (y : S) (xs : seq T) : {prob S} :=
-  foldr (fun x p => sample p (f x)) (dirac y) xs.
+  foldr (fun x p => sample (f x) p) (dirac y) xs.
 
 Fixpoint map_p T (S : ordType) (f : T -> {prob S}) (xs : seq T) : {prob seq S} :=
   match xs with
@@ -1044,7 +1044,7 @@ Variables (T : ordType) (S : ordType) (def : T -> S).
 
 Definition samplef (f : ffun (dirac \o def)) : {prob ffun def} :=
   sample: m <- mapm_p id (val f);
-  dirac (mkffun (fun x => odflt (def x) (m x)) (domm m)).
+  dirac (mkffun (fun x => odflt (def x) ((m : {fmap _}) x)) (domm m)).
 
 Lemma samplef0 : samplef emptyf = dirac emptyf.
 Proof.
