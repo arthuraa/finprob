@@ -440,7 +440,7 @@ Arguments supp_sampleP {_ _ _ _ _}.
 
 Notation "'sample:' x '<-' t1 ';' t2" :=
   (sample (fun x => t2) t1)
-  (at level 20, t1 at level 100, t2 at level 200,
+  (at level 20, x binder, t1 at level 100, t2 at level 200,
    right associativity, format "'[' 'sample:'  x  '<-'  '[' t1 ;  ']' ']' '/' t2")
   : prob_scope.
 
@@ -1043,8 +1043,8 @@ Section SampleFun.
 Variables (T : ordType) (S : ordType) (def : T -> S).
 
 Definition samplef (f : ffun (dirac \o def)) : {prob ffun def} :=
-  sample: m <- mapm_p id (val f);
-  dirac (mkffun (fun x => odflt (def x) ((m : {fmap _}) x)) (domm m)).
+  sample: m : {fmap T -> S} <- mapm_p id (val f);
+  dirac (mkffun (fun x => odflt (def x) (m x)) (domm m)).
 
 Lemma samplef0 : samplef emptyf = dirac emptyf.
 Proof.
