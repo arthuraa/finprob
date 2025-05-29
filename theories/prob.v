@@ -435,6 +435,7 @@ Qed.
 End Sample.
 
 Arguments supp_sampleP {_ _ _ _ _}.
+Arguments sample {T S}.
 
 (** A more convenient notation for sampling. *)
 
@@ -707,8 +708,136 @@ Qed.
 the elements of sequences, maps and other container types.  They will be used to
 define the semantics of Imp programs. *)
 
-Definition foldrM T (S : ordType) (f : T -> S -> {prob S}) (y : S) (xs : seq T) : {prob S} :=
-  foldr (fun x p => sample (f x) p) (dirac y) xs.
+Section FoldingM.
+
+Variables (T : Type) (S : ordType).
+Implicit Types (f : T -> S -> {prob S}) (x : T) (y : S) (xs : seq T).
+
+Definition foldrM f py0 xs : {prob S} :=
+  foldr (sample \o f) py0 xs.
+
+Lemma eq_foldrM f g py0 xs :
+  f =2 g ->
+  foldrM f py0 xs = foldrM g py0 xs.
+Proof.
+by move=> fg; elim: xs=> //= x xs ->; under eq_sample => ? do rewrite fg.
+Qed.
+
+Lemma foldrM_dirac g y0 xs :
+  foldrM (fun x y' => dirac (g x y')) (dirac y0) xs = dirac (foldr g y0 xs).
+Proof.
+by elim: xs => //= x xs ->; rewrite sample_diracL.
+Qed.
+
+Lemma foldrM_cat f py0 xs1 xs2 :
+  foldrM f py0 (xs1 ++ xs2) = foldrM f (foldrM f py0 xs2) xs1.
+Proof.
+by elim: xs1 => /= [|x xs1 IH]; rewrite ?sample_diracR // IH.
+Qed.
+
+Lemma foldrM_sample f py0 xs :
+  foldrM f py0 xs = sample: y <- py0; foldrM f (dirac y) xs.
+Proof.
+elim: xs => /= [|x xs IH]; rewrite ?sample_diracR //.
+by rewrite IH sampleA.
+Qed.
+
+Definition commutative_actp f :=
+  forall x1 x2 y, sample (f x1) (f x2 y) = sample (f x2) (f x1 y).
+
+Lemma commutative_actpP f :
+  commutative_actp f -> commutative_act (sample \o f).
+Proof.
+move=> fC x1 x2 py /=; rewrite !sampleA; apply/eq_sample => ?.
+by rewrite fC.
+Qed.
+
+Lemma foldrMC f py0 xs1 xs2 :
+  commutative_actp f ->
+  foldrM f py0 (xs1 ++ xs2) = foldrM f py0 (xs2 ++ xs1).
+Proof. move=> /commutative_actpP fC; exact: foldrC. Qed.
+
+Definition idempotent_actp f :=
+  forall x y, sample (f x) (f x y) = f x y.
+
+Lemma idempotent_actpP f :
+  idempotent_actp f -> idempotent_act (sample \o f).
+Proof.
+move=> fI x py /=; rewrite !sampleA; apply/eq_sample => ?.
+by rewrite fI.
+Qed.
+
+End FoldingM.
+
+Section FoldingMEq.
+
+Variables (T : eqType) (S : ordType).
+Implicit Types (f : T -> S -> {prob S}) (x : T) (y : S) (xs : seq T).
+
+Lemma foldrM_perm_eq f py0 xs1 xs2 :
+  commutative_actp f ->
+  perm_eq xs1 xs2 ->
+  foldrM f py0 xs1 = foldrM f py0 xs2.
+Proof. move=> /commutative_actpP; exact: foldr_perm_eq. Qed.
+
+Lemma foldrM_idem f py0 x s :
+  commutative_actp f ->
+  idempotent_actp f ->
+  x \in s ->
+  sample (f x) (foldrM f py0 s) = foldrM f py0 s.
+Proof.
+move=> /commutative_actpP ? /idempotent_actpP ?; exact: foldr_idem.
+Qed.
+
+Lemma foldrM_mem_eq f py0 xs1 xs2 :
+  commutative_actp f ->
+  idempotent_actp f ->
+  xs1 =i xs2 ->
+  foldrM f py0 xs1 = foldrM f py0 xs2.
+Proof.
+move=> /commutative_actpP fC /idempotent_actpP fI.
+exact: foldr_mem_eq.
+Qed.
+
+End FoldingMEq.
+
+Section FoldingMSet.
+
+Variables (T : ordType) (S : ordType).
+Implicit Types (f : T -> S -> {prob S}) (x : T) (y : S) (xs : seq T).
+Implicit Types (X : {fset T}).
+
+Lemma foldrM_fsetU_idem f py0 X1 X2 :
+  commutative_actp f ->
+  idempotent_actp f ->
+  foldrM f py0 (X1 :|: X2) = foldrM f (foldrM f py0 X2) X1.
+Proof.
+move=> /commutative_actpP fC /idempotent_actpP fI.
+exact: foldr_fsetU_idem.
+Qed.
+
+Lemma foldrM_fset1U_idem f py0 x X :
+  commutative_actp f ->
+  idempotent_actp f ->
+  foldrM f py0 (x |: X) = sample (f x) (foldrM f py0 X).
+Proof.
+move=> /commutative_actpP fC /idempotent_actpP fI.
+exact: foldr_fset1U_idem.
+Qed.
+
+End FoldingMSet.
+
+Section FoldMMap.
+
+Variables (T1 T2 : Type) (S : ordType).
+Implicit Types (h : T1 -> T2) (f : T2 -> S -> {prob S}) (xs : seq T1).
+
+Lemma foldrM_map h f z0 s :
+  foldrM f z0 [seq h i | i <- s] =
+  foldrM (fun x z => f (h x) z) z0 s.
+Proof. exact: foldr_map. Qed.
+
+End FoldMMap.
 
 Fixpoint map_p T (S : ordType) (f : T -> {prob S}) (xs : seq T) : {prob seq S} :=
   match xs with
@@ -773,7 +902,7 @@ Definition mapim_p (S : Type) (R : ordType)
 
 Lemma mapim_pE S R f m :
   @mapim_p S R f m =
-  foldrM (fun p m => sample: z <- f p.1 p.2; dirac (setm m p.1 z)) emptym m.
+  foldrM (fun p m => sample: z <- f p.1 p.2; dirac (setm m p.1 z)) (dirac emptym) m.
 Proof.
 rewrite /mapim_p /=.
 elim: (val m)=> {m} [|[x y] m /= IH] //=.
