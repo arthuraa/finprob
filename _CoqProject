@@ -1,4 +1,7 @@
 -arg "-w -parsing,-redundant-canonical-projection,-notation-overridden,-projection-no-head-constant,-ambiguous-paths"
 -R theories finprob
 
+theories/complements.v
+theories/extructures_complements.v
+theories/finmap_complements.v
 theories/prob.v

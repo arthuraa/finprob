@@ -18,6 +18,8 @@ From extructures.instances Require Import instances.
 
 From deriving Require Import deriving.
 
+From finprob Require Import complements extructures_complements.
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -27,8 +29,6 @@ Local Open Scope fset_scope.
 
 Declare Scope prob_scope.
 Local Open Scope prob_scope.
-
-Arguments bigcupP {T I x s P F}.
 
 Section Prob.
 
