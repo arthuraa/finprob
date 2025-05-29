@@ -6,9 +6,10 @@ mass distribution, whereas the monadic bind [sample : {prob T} -> (T -> {prob
 S}) -> {prob S}] samples from its first argument and feeds the sample to its
 second argument. *)
 
-Require Import Coq.Strings.String.
-Require Import Coq.Unicode.Utf8.
+Require Import Stdlib.Strings.String.
+Require Import Stdlib.Unicode.Utf8.
 
+From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat choice seq
   ssrint rat ssralg ssrnum bigop path.
 
@@ -47,18 +48,15 @@ Notation "{ 'distr' T }" := (distr_of (Phant T))
   (at level 0, format "{ 'distr'  T }") : form_scope.
 Identity Coercion distr_of_distr : distr_of >-> distr.
 
-Canonical distr_subType  := [subType for dval].
-Definition distr_eqMixin := [eqMixin of distr by <:].
-Canonical distr_eqType   := EqType distr distr_eqMixin.
-Definition distr_choiceMixin := [choiceMixin of distr by <:].
-Canonical distr_choiceType := Eval hnf in ChoiceType distr distr_choiceMixin.
-Definition distr_ordMixin := [ordMixin of distr by <:].
-Canonical distr_ordType := Eval hnf in OrdType distr distr_ordMixin.
+HB.instance Definition _ := [isSub of distr for dval].
+HB.instance Definition _ := [Equality of distr by <:].
+HB.instance Definition _ := [Choice of distr by <:].
+HB.instance Definition _ := [Ord of distr by <:].
 
-Canonical distr_of_newType := [subType of {distr T}].
-Canonical distr_of_eqType  := [eqType of {distr T}].
-Canonical distr_of_choiceType := [choiceType of {distr T}].
-Canonical distr_of_ordType := [ordType of {distr T}].
+HB.instance Definition _ := SubType.copy {distr T} distr.
+HB.instance Definition _ := Equality.copy {distr T} distr.
+HB.instance Definition _ := Choice.copy {distr T} distr.
+HB.instance Definition _ := Ord.Ord.copy {distr T} distr.
 
 Implicit Types (d : {distr T}).
 
@@ -122,18 +120,15 @@ Notation "{ 'prob' T }" := (prob_of (Phant T))
 Identity Coercion prob_of_prob : prob_of >-> prob.
 Coercion pval : prob >-> distr_of.
 
-Canonical prob_subType := [subType for pval].
-Definition prob_eqMixin := [eqMixin of prob by <:].
-Canonical prob_eqType := EqType prob prob_eqMixin.
-Definition prob_choiceMixin := [choiceMixin of prob by <:].
-Canonical prob_choiceType := Eval hnf in ChoiceType prob prob_choiceMixin.
-Definition prob_ordMixin := [ordMixin of prob by <:].
-Canonical prob_ordType := Eval hnf in OrdType prob prob_ordMixin.
+HB.instance Definition _ := [isSub of prob for pval].
+HB.instance Definition _ := [Equality of prob by <:].
+HB.instance Definition _ := [Choice of prob by <:].
+HB.instance Definition _ := [Ord of prob by <:].
 
-Canonical prob_of_subType := [subType of {prob T}].
-Canonical prob_of_eqType  := [eqType  of {prob T}].
-Canonical prob_of_choiceType := [choiceType of {prob T}].
-Canonical prob_of_ordType := [ordType of {prob T}].
+HB.instance Definition _ := SubType.copy {prob T} prob.
+HB.instance Definition _ := Equality.copy {prob T} prob.
+HB.instance Definition _ := Choice.copy {prob T} prob.
+HB.instance Definition _ := Ord.Ord.copy {prob T} prob.
 
 Implicit Types (p : {prob T}).
 
@@ -875,9 +870,9 @@ apply/(sameP supp_sampleP)/(iffP andP).
     by rewrite val_domm size_map.
   move: x1 ex e1 e2 {e1' e2'}=> {x2} x <- e1 e2.
   have {}e1: m1 x = Some y.
-    by apply/getmP; rewrite -e1; apply/mem_nth.
+    by apply/in_fmapP; rewrite -e1; apply/mem_nth.
   have {}e2: m2 x = Some z.
-    by apply/getmP; rewrite -e2; apply/mem_nth; rewrite -esize.
+    by apply/in_fmapP; rewrite -e2; apply/mem_nth; rewrite -esize.
   have xP: x \in domm m1 by rewrite mem_domm e1.
   move/allP/(_ _ xP): ecodomm; rewrite e1 e2=> yz.
   by apply/supp_sampleP; exists z; rewrite // supp_dirac in_fset1 eqxx.
@@ -898,7 +893,7 @@ apply/(sameP supp_sampleP)/(iffP andP).
   apply/allP=> x /dommP [y yP]; rewrite yP fmvalK.
   have /dommP [z zP]: x \in domm m2 by rewrite -edomm mem_domm yP.
   rewrite zP.
-  case/getmP/(nthP (x, y)): (yP)=> /= i isize ei1.
+  case/in_fmapP/(nthP (x, y)): (yP)=> /= i isize ei1.
   have ei1domm : nth x (domm m1) i = x.
     by rewrite val_domm (nth_map (x, y)) // ei1.
   have ei2: nth (x, z) m2 i = (x, z).
