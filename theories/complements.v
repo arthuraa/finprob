@@ -12,7 +12,7 @@ Section Fold.
 
 Variables (T : Type) (S : Type).
 
-Implicit Types (f : T -> S -> S) (x : T) (y : S) (s : seq T).
+Implicit Types (f g : T -> S -> S) (x : T) (y : S) (s : seq T).
 
 Definition commutative_act f :=
   forall x1 x2 y, f x1 (f x2 y) = f x2 (f x1 y).
@@ -36,7 +36,25 @@ move=> fC; rewrite !foldr_cat.
 by elim: s1 => // x s1 IH /= in fC *; rewrite foldr_rcons ?IH //.
 Qed.
 
+Lemma eq_foldr f g y0 s : f =2 g -> foldr f y0 s = foldr g y0 s.
+Proof. by move=> fg; elim: s => //= x s ->; rewrite fg. Qed.
+
 End Fold.
+
+Section FoldEqType.
+
+Variables (T : eqType) (S : Type).
+
+Implicit Types (f g : T -> S -> S) (x : T) (y : S) (s : seq T).
+
+Lemma eq_in_foldr f g y0 s : {in s, f =2 g} -> foldr f y0 s = foldr g y0 s.
+Proof.
+move=> fg; have sub: {subset s <= s} by [].
+elim: {-2}(s) sub => //= x xs IH sub; rewrite fg ?sub ?inE ?eqxx //.
+by rewrite IH // => ? in_xs; apply: sub; rewrite inE in_xs orbT.
+Qed.
+
+End FoldEqType.
 
 Section FoldPerm.
 
