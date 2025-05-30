@@ -934,27 +934,31 @@ Lemma mapim_p_comp (S R U : ordType)
   mapim_p (fun x y => g x (f x y)) m.
 Proof. by rewrite /mapim_p /= map_p_comp. Qed.
 
+Lemma mapim_p0 S R f : @mapim_p S R f emptym = dirac emptym.
+Proof. by rewrite mapim_pE /=. Qed.
+
+Lemma mapim_p_setm S R f m x y :
+  @mapim_p S R f (setm m x y) =
+  sample: z <- f x y;
+  sample: m' <- mapim_p f m;
+  dirac (setm m' x z).
+Proof.
+rewrite !mapim_pE /foldrM foldr_setm /= 1?sampleC //.
+- move=> /= {x y} x1 x2 y1 y2 pm x1x2.
+  rewrite !sampleA; apply/eq_sample=> /= m'.
+  rewrite !sampleA; under eq_sample do rewrite sample_diracL.
+  rewrite sampleC; apply/eq_sample => /= z; rewrite sample_diracL.
+  by apply/eq_sample => /= z'; rewrite setmC // eq_sym.
+- move=> /= {}x y1 y2 pm; rewrite sampleA; apply/eq_sample => /= m'.
+  rewrite sampleA; under eq_sample => z.
+    rewrite sample_diracL; under eq_sample do rewrite setmxx; over.
+  by rewrite sample_const.
+Qed.
+
 Fact mapm_p_key : unit. Proof. exact: tt. Qed.
 
 Definition mapm_p (S : Type) (R : ordType) (f : S -> {prob R}) :=
   locked_with mapm_p_key (mapim_p (fun (x : T) => f)).
-
-Lemma mapm_pE S R f m :
-  @mapm_p S R f m =
-  if splitm m is Some (x, y, m) then
-    sample: z <- f y;
-    sample: m <- mapm_p f m;
-    dirac (setm m x z)
-  else dirac emptym.
-Proof.
-rewrite /splitm /= /mapm_p unlock /mapim_p /=.
-move: (valP m) => /=; case: (val m)=> [|[x y] ps] //=.
-  by rewrite sample_diracL.
-move=> /path_sorted psP.
-rewrite !sampleA; apply/eq_sample=> z.
-rewrite sample_diracL !sampleA mkfmapK //.
-by apply/eq_sample=> /= ps'; rewrite !sample_diracL.
-Qed.
 
 Lemma eq_mapm_p (S : Type) (R : ordType) (f g : S -> {prob R}) :
   f =1 g -> mapm_p f =1 mapm_p g.
@@ -1054,29 +1058,14 @@ rewrite supp_mapm_p; apply/(iffP andP).
 Qed.
 
 Lemma mapm_p0 (S R : ordType) f : @mapm_p S R f emptym = dirac emptym.
-Proof. by rewrite mapm_pE /=. Qed.
+Proof. by rewrite /mapm_p unlock mapim_p0. Qed.
 
 Lemma mapm_p_setm (S R : ordType) f m x y :
   @mapm_p S R f (setm m x y) =
   sample: m <- mapm_p f m;
   sample: z  <- f y;
   dirac (setm m x z).
-Proof.
-rewrite /mapm_p unlock !mapim_pE [setm m x y]/setm /=.
-case: m=> /=; elim=> [|[x' y'] m IH] //=.
-case: Ord.ltgtP=> [//|xx'|{x'} <-] //= mP.
-  rewrite IH ?(path_sorted mP) //.
-  rewrite !sampleA; apply/eq_sample=> /= m'.
-  rewrite sampleC sampleA; apply/eq_sample=> /= z.
-  rewrite sampleA sample_diracL; apply/eq_sample=> /= z'.
-  rewrite sample_diracL setmC // eq_sym.
-  by case: Ord.ltgtP xx'.
-rewrite sampleA; apply/eq_sample=> m'.
-rewrite sampleC; apply/eq_sample=> z.
-rewrite sampleA.
-under eq_sample=> ? do rewrite sample_diracL setmxx.
-by rewrite sample_const.
-Qed.
+Proof. by rewrite /mapm_p unlock mapim_p_setm sampleC. Qed.
 
 (*
 Lemma mapm_pE' (S R : ordType) f my mz :
